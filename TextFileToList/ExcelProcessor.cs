@@ -27,6 +27,7 @@ namespace TextFileToList
             }
 
             // Create and save the Excel file
+            ExcelPackage.License.SetNonCommercialPersonal("Andrea"); 
             using (var package = new ExcelPackage())
             {
                 var worksheet = package.Workbook.Worksheets.Add("Sheet1");
