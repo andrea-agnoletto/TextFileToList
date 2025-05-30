@@ -3,6 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Timers;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Threading.Tasks;
+using System.Net;
+using System.Linq;
 
 namespace TextFileToList
 {
@@ -79,6 +84,99 @@ namespace TextFileToList
             }
 
             Console.WriteLine("\nCompression completed.");
+        }
+
+        public static void SimpleCompressFile(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
+            }
+
+            if (!File.Exists(filePath))
+            {
+                throw new FileNotFoundException("The specified file does not exist.", filePath);
+            }
+
+            string zipFilePath = filePath + ".zip";
+
+            using (FileStream originalFileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+            using (FileStream zipFileStream = new FileStream(zipFilePath, FileMode.Create))
+            using (var zipArchive = new ZipArchive(zipFileStream, ZipArchiveMode.Create))
+            {
+                var entry = zipArchive.CreateEntry(Path.GetFileName(filePath));
+
+                using (var entryStream = entry.Open())
+                {
+                    originalFileStream.CopyTo(entryStream);
+                }
+            }
+
+            Console.WriteLine("File successfully compressed to: " + zipFilePath);
+        }
+
+        public static async Task UploadFile(string filePath, string endpointUri)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
+            }
+
+            if (!File.Exists(filePath))
+            {
+                throw new FileNotFoundException("The specified file does not exist.", filePath);
+            }
+
+            if (string.IsNullOrWhiteSpace(endpointUri))
+            {
+                throw new ArgumentException("Endpoint URI cannot be null or empty.", nameof(endpointUri));
+            }
+
+            using (HttpClient client = new HttpClient(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate }))
+            using (var multipartContent = new MultipartFormDataContent())
+            {
+                // Add the file content
+                using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+                {
+                    var fileContent = new StreamContent(fileStream);
+                    fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                    multipartContent.Add(fileContent, "file", Path.GetFileName(filePath));
+                }
+
+                // Add the JSON object
+                var jsonObject = new { filePath };
+                var jsonContent = new StringContent(System.Text.Json.JsonSerializer.Serialize(jsonObject), System.Text.Encoding.UTF8, "application/json");
+                multipartContent.Add(jsonContent, "metadata");
+
+                Console.WriteLine($"Uploading file '{filePath}' to '{endpointUri}' with HTTP compression...");
+
+                HttpResponseMessage response = await client.PostAsync(endpointUri, multipartContent);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine("File uploaded successfully.");
+                }
+                else
+                {
+                    Console.WriteLine($"File upload failed. Status code: {response.StatusCode}");
+                }
+            }
+        }
+
+        public static List<string> GetFoldersFromPath(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
+            }
+
+            string? directoryPath = Path.GetDirectoryName(filePath);
+            if (string.IsNullOrEmpty(directoryPath))
+            {
+                throw new ArgumentException("The provided path does not contain any folders.", nameof(filePath));
+            }
+
+            return directoryPath.Split(Path.DirectorySeparatorChar).ToList();
         }
     }
 }
