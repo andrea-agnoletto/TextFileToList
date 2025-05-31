@@ -64,5 +64,22 @@ namespace TextFileToList.Controllers
 
             return Ok(new { Message = "File uploaded successfully.", FilePath = filePath });
         }
+
+        [HttpGet]
+        public IActionResult IsFilePresent(string relativeFilePath)
+        {
+            if (relativeFilePath == null)
+                return BadRequest($"{relativeFilePath} is missing in url param.");
+
+            string crmFileRepoBaseDirectory = "C:\\TustenadataTarget";
+            string saveFile = Path.Combine(crmFileRepoBaseDirectory, relativeFilePath);
+
+            if(System.IO.File.Exists(saveFile))
+            {
+                return Ok(true);
+            }
+
+            return NotFound();
+        }
     }
 }
